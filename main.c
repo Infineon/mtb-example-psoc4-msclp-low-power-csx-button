@@ -29,6 +29,9 @@
 /* Enable this, if Tuner needs to be enabled */
 #define ENABLE_TUNER                    (1u)
 
+/* Enable LED */
+#define ENABLE_LED                      (1u)
+
 /* 128Hz Refresh rate in Active mode */
 #define ACTIVE_MODE_REFRESH_RATE        (128u)
 
@@ -42,13 +45,20 @@
 #define ALR_MODE_TIMEOUT_SEC            (5u)
 
 /* Active mode Scan time calculated in us ~= 12us */
+#ifdef TARGET_APP_CY8CPROTO_041TP
+#define ACTIVE_MODE_FRAME_SCAN_TIME     (18u)
+#else
 #define ACTIVE_MODE_FRAME_SCAN_TIME     (12u)
-
+#endif
 /* Active mode Processing time in us ~= 24us with  Tuner disabled*/
 #define ACTIVE_MODE_PROCESS_TIME        (24u)
 
+#ifdef TARGET_APP_CY8CPROTO_041TP
 /* ALR mode Scan time calculated in us ~= 12us */
-#define ALR_MODE_FRAME_SCAN_TIME        (12u)
+#define ALR_MODE_FRAME_SCAN_TIME        (18u)
+#else
+#define ALR_MODE_FRAME_SCAN_TIME     (12u)
+#endif
 
 /* ALR mode Processing time in us ~= 24us with  Tuner disabled*/
 #define ALR_MODE_PROCESS_TIME           (24u)
@@ -126,7 +136,9 @@ static void start_runtime_measurement();
 static uint32_t stop_runtime_measurement();
 #endif
 
+#if ENABLE_LED
 void led_control();
+#endif
 
 /* Deep Sleep Callback function */
 void register_callback(void);
@@ -202,16 +214,16 @@ int main(void)
     uint32_t capsense_state_timeout;
     uint32_t interruptStatus;
 
-#if ENABLE_RUN_TIME_MEASUREMENT
+    #if ENABLE_RUN_TIME_MEASUREMENT
     static uint32_t active_processing_time;
     static uint32_t alr_processing_time;
-#endif
+    #endif
     /* Initialize the device and board peripherals */
     result = cybsp_init() ;
 
-#if ENABLE_RUN_TIME_MEASUREMENT
+    #if ENABLE_RUN_TIME_MEASUREMENT
     init_sys_tick();
-#endif
+    #endif
 
     /* Board init failed. Stop program execution */
     if (result != CY_RSLT_SUCCESS)
@@ -261,10 +273,10 @@ int main(void)
                     interruptStatus = Cy_SysLib_EnterCriticalSection();
                 }
 
-#if ENABLE_RUN_TIME_MEASUREMENT
+                #if ENABLE_RUN_TIME_MEASUREMENT
                 active_processing_time=0;
                 start_runtime_measurement();
-#endif
+                #endif
 
                 Cy_SysLib_ExitCriticalSection(interruptStatus);
 
@@ -289,15 +301,15 @@ int main(void)
                     }
                 }
 
-#if ENABLE_RUN_TIME_MEASUREMENT
+                #if ENABLE_RUN_TIME_MEASUREMENT
                 active_processing_time=stop_runtime_measurement();
-#endif
+                #endif
 
                 break;
                 /* End of ACTIVE_MODE */
 
                 /* Active Low Refresh-rate Mode */
-            case ALR_MODE :
+            case ALR_MODE:
 
                 Cy_CapSense_ScanAllSlots(&cy_capsense_context);
                 interruptStatus = Cy_SysLib_EnterCriticalSection();
@@ -314,10 +326,10 @@ int main(void)
 
                 Cy_SysLib_ExitCriticalSection(interruptStatus);
 
-#if ENABLE_RUN_TIME_MEASUREMENT
+                #if ENABLE_RUN_TIME_MEASUREMENT
                 alr_processing_time=0;
                 start_runtime_measurement();
-#endif
+                #endif
 
                 Cy_CapSense_ProcessAllWidgets(&cy_capsense_context);
 
@@ -340,9 +352,9 @@ int main(void)
                     }
                 }
 
-#if ENABLE_RUN_TIME_MEASUREMENT
+                #if ENABLE_RUN_TIME_MEASUREMENT
                 alr_processing_time=stop_runtime_measurement();
-#endif
+                #endif
 
                 break;
                 /* End of Active-Low Refresh Rate(ALR) mode */
@@ -391,13 +403,14 @@ int main(void)
                 CY_ASSERT(CY_ASSERT_FAILED);
                 break;
         }
-
+        #if ENABLE_LED
         led_control();
+        #endif
 
-#if ENABLE_TUNER
+        #if ENABLE_TUNER
         /* Establishes synchronized communication with the CAPSENSE&trade; Tuner tool */
         Cy_CapSense_RunTuner(&cy_capsense_context);
-#endif
+        #endif
     }
 }
 
@@ -487,9 +500,11 @@ static void initialize_capsense_tuner(void)
      * the Tuner or the Bridge Control Panel can read this buffer but you can
      * connect only one tool at a time.
      */
+    #if ENABLE_TUNER
     Cy_SCB_EZI2C_SetBuffer1(CYBSP_EZI2C_HW, (uint8_t *)&cy_capsense_tuner,
             sizeof(cy_capsense_tuner), sizeof(cy_capsense_tuner),
             &ezi2c_context);
+    #endif
 
     Cy_SCB_EZI2C_Enable(CYBSP_EZI2C_HW);
 
@@ -565,6 +580,7 @@ static uint32_t stop_runtime_measurement()
  * Parameters:
  *  DEVICE_STATE - device power mode state
  *******************************************************************************/
+#if ENABLE_LED
 void led_control()
 {
     if (CAPSENSE_WIDGET_INACTIVE != Cy_CapSense_IsWidgetActive(CY_CAPSENSE_BUTTON0_WDGT_ID, &cy_capsense_context))
@@ -576,6 +592,7 @@ void led_control()
         Cy_GPIO_Write(CYBSP_USER_LED2_PORT, CYBSP_USER_LED2_NUM, CYBSP_LED_OFF);
     }
 }
+#endif
 
 /*******************************************************************************
  * Function Name: register_callback
